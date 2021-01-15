@@ -7,12 +7,14 @@ from scrapy import signals
 
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
-from config import PROXY_URL, UA_LIST
+from config import PROXY_URL, UA_LIST, PROXY_TOOL_PORT
 from scrapy.downloadermiddlewares.httpproxy import HttpProxyMiddleware
 import requests
 import time
 import random
+from scrapy import Request
 from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
+from .spiders import single_process_spider
 
 
 
@@ -110,13 +112,17 @@ class DoubanSpiderDownloaderMiddleware:
         spider.logger.info('Spider opened: %s' % spider.name)
 
 
-class DoubanSpiderProxyMiddleware(HttpProxyMiddleware):
-    def process_request(self, request, spider):
-        if request.meta.get('retry_times'):
-            proxy = requests.get(PROXY_URL).text
+class DoubanSpiderProxyMiddleware:
+    def process_response(self, request, response, spider):
+        proxy = PROXY_TOOL_PORT
+        if response.status in [302, 403]:
             if proxy:
-                print("当前使用IP是：", proxy)
-                request.meta['proxy'] = "https://" + proxy
+                request.meta['proxy'] = f'https://{proxy}'
+                new_request = request.replace(meta=request.meta, dont_filter=True)
+                new_request.priority = request.priority + 2
+                return new_request
+        else:
+            return response
 
 
 class DoubanSpiderRandomDelayMiddleware:
@@ -128,13 +134,11 @@ class DoubanSpiderRandomDelayMiddleware:
         return cls(crawler)
 
     def process_request(self, request, spider):
-        delay = random.randint(0, self.delay)
+        delay = random.randint(self.delay[0], self.delay[1])
         time.sleep(delay)
 
-class DoubanSpiderRandomUAMiddleware(UserAgentMiddleware):
-    def __init__(self, user_agent=''):
-        self.user_agent = user_agent
 
+class DoubanSpiderRandomUAMiddleware(UserAgentMiddleware):
     def process_request(self, request, spider):
         ua = random.choice(UA_LIST)
         if ua:

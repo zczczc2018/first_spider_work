@@ -5,8 +5,8 @@
 
 
 # useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
-from mysqlOperator import MysqlOperator
+from .model.mysqlOperator import MysqlOperator
+from .model.doubanSpiderModel import DoubanMovie
 
 class DoubanSpiderPipeline:
     def process_item(self, item, spider):
@@ -22,5 +22,11 @@ class MysqlPipeline:
     def process_item(self, item, spider):
         data = dict(item)
         self.mysqloperator.update("movies", data)
+
+
+class SqlAlchemyPipeline:
+    def process_item(self, item, spider):
+        data = dict(item)
+        DoubanMovie().add_movie_info(**data)
 
 
